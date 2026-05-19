@@ -21,13 +21,20 @@ func ServeFS(sockpath string, rawFS fuse.RawFileSystem, opts *fuse.MountOptions)
 	if err != nil {
 		log.Fatal("Listen", err)
 	}
+	defer l.Close()
+	ServeFSListener(l, rawFS, opts)
+}
 
+func ServeFSListener(l *net.UnixListener, rawFS fuse.RawFileSystem, opts *fuse.MountOptions) error {
+	if opts == nil {
+		opts = &fuse.MountOptions{}
+	}
 	opts.DisableSplice = true
 	ps := fuse.NewProtocolServer(rawFS, opts)
 	for {
 		conn, err := l.AcceptUnix()
 		if err != nil {
-			break
+			return err
 		}
 
 		dev := vhostuser.NewDevice(func(vqe *vhostuser.VirtqElem) int {
@@ -40,7 +47,6 @@ func ServeFS(sockpath string, rawFS fuse.RawFileSystem, opts *fuse.MountOptions)
 		if err := srv.Serve(); err != nil {
 			log.Printf("Serve: %v %T", err, err)
 		}
-
 		srv.Close()
 	}
 }
